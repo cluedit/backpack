@@ -15,7 +15,6 @@ class BaseCollection(object):
         Creates a new Collection
 
         :param items: The collection items
-        :param items: The collection itdems
         :type items: list or Collection or map
 
         :rtype: None
@@ -46,6 +45,52 @@ class BaseCollection(object):
             return items
 
         return cls(items)
+    
+    def __len__(self):
+        return len(self.items)
+
+    def __iter__(self):
+        for item in self.items:
+            yield item
+
+    def __getitem__(self, item):
+        if isinstance(item, slice):
+            return self.__class__.make(self.items[item])
+
+        return self.items[item]
+
+    def __setitem__(self, key, value):
+        self.items[key] = value
+
+    def __delitem__(self, key):
+        del self.items[key]
+
+    def __eq__(self, other):
+        if isinstance(other, BaseCollection):
+            other = other.items
+
+        return other == self.items
+
+    def __ne__(self, other):
+        if isinstance(other, BaseCollection):
+            other = other.items
+
+        return other != self.items
+
+    def _set_items(self, items):
+        self._items = items
+
+    def _get_items(self, items):
+        if isinstance(items, list):
+            return items
+        elif isinstance(items, tuple):
+            return list(items)
+        elif isinstance(items, BaseCollection):
+            return items.all()
+        elif hasattr('items', 'to_list'):
+            return items.to_list()
+
+        return [items]
 
     def all(self):
         """
@@ -781,48 +826,105 @@ class BaseCollection(object):
         """
         return json.dumps(self.serialize(), **options)
 
-    def __len__(self):
-        return len(self.items)
+    def average(self, key=None):
+        """
+        Get the average value of a given key.
 
-    def __iter__(self):
-        for item in self.items:
-            yield item
+        :param key: The key to get the average for
+        :type key: mixed
 
-    def __getitem__(self, item):
-        if isinstance(item, slice):
-            return self.__class__.make(self.items[item])
+        :rtype: float or int
+        """
+        count = self.count()
 
-        return self.items[item]
+        if count:
+            return self.sum(key) / count
+    
+    def combine(self, value):
+        """
+        Combine the keys of the collection with the values of another collection.
 
-    def __setitem__(self, key, value):
-        self.items[key] = value
+        :param value: The value of the element
+        :type value: list or Collection
 
-    def __delitem__(self, key):
-        del self.items[key]
+        :rtype: Collection
+        """
+        if isinstance(value, BaseCollection):
+            value = value.serialize()
 
-    def __eq__(self, other):
-        if isinstance(other, BaseCollection):
-            other = other.items
+        if not isinstance(value, list):
+            raise ValueError('Unable to combine uncompatible types')
 
-        return other == self.items
+        return self.__class__(dict(zip(self.serialize(), value)))
 
-    def __ne__(self, other):
-        if isinstance(other, BaseCollection):
-            other = other.items
+    def concat(self, items):
+        """
+        Append the given array or collection values onto the end of the collection.
 
-        return other != self.items
+        :param value: The value of the element
+        :type value: list or Collection
 
-    def _set_items(self, items):
-        self._items = items
+        :rtype: Collection
+        """
+        if isinstance(items, BaseCollection):
+            items = items.all()
 
-    def _get_items(self, items):
-        if isinstance(items, list):
-            return items
-        elif isinstance(items, tuple):
-            return list(items)
-        elif isinstance(items, BaseCollection):
-            return items.all()
-        elif hasattr('items', 'to_list'):
-            return items.to_list()
+        if not isinstance(items, list):
+            raise ValueError('Unable to concat uncompatible types')
+        
+        for item in items:
+            self.append(item)
 
-        return [items]
+        return self
+
+    def cross_join(self, value):
+        """
+        Cross joins the collection's values among the given arrays or collections,
+        returning a Cartesian product with all possible permutations.
+
+        :param value: The value of the element
+        :type value: list or Collection
+
+        :rtype: Collection
+        """
+        if isinstance(value, BaseCollection):
+            value = value.all()
+
+        if not isinstance(value, list):
+            raise ValueError('Unable to cross join uncompatible types')
+
+        import itertools
+        return self.__class__(
+            list(
+                map(lambda item: list(item), itertools.product(self.all(), value))
+            )
+        )
+
+    def each_spread(self, callback):
+        """
+        Execute a callback over each item,
+        passing each nested item value into the given callback.
+
+        .. code::
+
+            collection = Collection([['John Doe', 35], ['Jane Doe', 33]])
+            # or
+            collection = Collection([{'name': 'John Doe', 'age': 35}, {'name': 'Jane Doe', 'age': 33}])
+            collection.each_spread(lambda name, age: age + 3)
+
+        :param callback: The callback to execute
+        :type callback: callable
+
+        :rtype: Collection
+        """
+        items = self.items
+
+        for item in items:
+            if isinstance(item, list):
+                if callback(*item) is False:
+                    break
+            elif isinstance(item, dict):
+                if callback(**item) is False:
+                    break
+
+        return self

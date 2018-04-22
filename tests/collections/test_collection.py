@@ -83,6 +83,16 @@ class CollectionTestCase(TestCase):
         c = Collection()
         self.assertIsNone(c.avg())
 
+    def test_get_average_items_from_collection(self):
+        c = Collection([{'foo': 10}, {'foo': 20}])
+        self.assertEqual(15, c.average('foo'))
+
+        c = Collection([1, 2, 3, 4, 5])
+        self.assertEqual(3, c.average())
+
+        c = Collection()
+        self.assertIsNone(c.average())
+
     def test_collapse(self):
         obj1 = object()
         obj2 = object()
@@ -256,3 +266,81 @@ class CollectionTestCase(TestCase):
 
         c = Collection([1, [2, 3], 4])
         self.assertEqual([1, 2, 3, 4], c.flatten().all())
+
+    def test_combine(self):
+        c = Collection(['name', 'age'])
+
+        self.assertEqual(
+            Collection({ 
+                'name': 'sgkim',
+                'age': 30
+            }),
+            c.combine(['sgkim', 30]).all()
+        )
+
+        c = Collection(['name', 'age'])
+
+        self.assertEqual(
+            Collection({ 
+                'name': 'sgkim',
+                'age': 30
+            }),
+            c.combine(Collection(['sgkim', 30])).all()
+        )
+    
+    def test_concat(self):
+        c = Collection([1, 2, 3])
+
+        self.assertEqual(
+            [1, 2, 3, 4, 5, 6, 7],
+            c.concat([4, 5, 6, 7]).all()
+        )
+
+        c = Collection([1, 2, 3])
+
+        self.assertEqual(
+            [1, 2, 3, 4, 5, 6, 7],
+            c.concat(Collection([4, 5, 6, 7])).all()
+        )
+
+    def test_cross_join(self):
+        c = Collection([1, 2])
+
+        self.assertEqual(
+            [
+                [1, 'a'],
+                [1, 'b'],
+                [2, 'a'],
+                [2, 'b']
+            ],
+            c.cross_join(['a', 'b']).all()
+        )
+
+        c = Collection([1, 2])
+
+        self.assertEqual(
+            [
+                [1, 'a'],
+                [1, 'b'],
+                [2, 'a'],
+                [2, 'b']
+            ],
+            c.cross_join(Collection(['a', 'b'])).all()
+        )
+    
+    def test_each_spread(self):
+        original = [['John Doe', 35], ['Jane Doe', 33]]
+        names = ['John Doe', 'Jane Doe']
+        c = Collection(original)
+
+        result = []
+        c.each_spread(lambda name, age: result.append(name))
+        self.assertEqual(result, names)
+
+        original = [{'name': 'John Doe', 'age': 35}, {'name': 'Jane Doe', 'age': 33}]
+        names = ['John Doe', 'Jane Doe']
+        c = Collection(original)
+
+        result = []
+        c.each_spread(lambda name, age: result.append(name))
+        self.assertEqual(result, names)

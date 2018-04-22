@@ -26,3 +26,6 @@ nosetests.xml
 benchmark.py
 results.json
 profile.html
+
+.venv
+.pytest_cache
